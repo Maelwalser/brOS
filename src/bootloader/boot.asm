@@ -37,7 +37,176 @@ ebr_system_id:			db 'FAT12   '		; 8 bytes
 ;
 
 start:
-	jmp main
+	; setup data segments
+	mov ax, 0	; can't write to ds/es directly
+	mov ds, ax
+	mov es, ax
+
+	; setup stack
+	mov ss, ax
+	mov sp, 0x7C00	; stack grows downwards from where we are loaded in memory
+
+	; some BIOSes start at 07C0:0000 instead of 0000:7C00, make sure we are at the expected location
+	push es
+	push word .after
+	retf
+
+
+.after:
+
+	; read something from floppy disk
+	; BIOS should set DL to drive number
+	mov [ebr_drive_number], dl
+
+	; Print loading message
+	mov si, msg_loading	
+	call puts
+
+	; read drive parameters, sectors per track and head count with BIOS
+	push es
+	mov ah, 08h			; Getting amount of heads and sectors with int 13h ah8
+	int 13h
+	jc floppy_error
+	pop es
+
+
+	and cl, 0x3F			; remove top 2 bits
+	xor ch, ch
+	mov [bdb_sectors_per_track], cx	; Sector count
+	
+	inc dh
+	mov [bdb_heads], dh		; head count
+
+	; LBA of root directory = RESERVED + FILE ALLOCATION TABLE * Amount of Sectors per FILE ALLOCATION TABLE
+	mov ax, [bdb_sectors_per_fat]	
+	mov bl, [bdb_fat_count]		; 
+	xor bh, bh
+	mul bx				; ax = FILE ALLOCATION TABLE * Amount of Sectors per FILE ALLOCATION TABLE
+	
+	add ax, [bdb_reserved_sectors]	; ax = LBA of ROOT DIRECTORY
+	push ax
+
+
+	; Calculate the size of ROOT DIRECTORY, one entry is 32 bytes = (32 bytes * number of entries) / bytes per SECTOR
+	mov ax, [bdb_dir_entries_count]	
+	shl ax, 5			; ax *= 32
+	xor dx, dx			; dx = 0 
+	div word [bdb_bytes_per_sector]	; number of SECTORS we need to read
+
+	test dx, dx			; If the remainder is not 0 add 1
+	jz .root_dir_after
+	inc ax				; Adding when when remainder is not 0, which indicates we have a SECTOR only partially filled with entries	
+
+
+.root_dir_after:
+	; read ROOT DIRECTORY
+	mov cl, al			; al =  number of SECTORS to read, which is the size of the ROOT DIRECTORY
+	pop ax				; ax = LBA of root directory
+	mov dl, [ebr_drive_number]	; dl = drive number
+	mov bx, buffer			; es:bx = buffer
+	call disk_read
+
+	; Search for kernel.bin
+	xor bx, bx			; bx used to store count how many entries we already compared
+	mov di, buffer			; points to the current directory entry
+
+
+
+
+.search_kernel:
+	mov si, file_kernel_bin
+	mov cx, 11			; Compare up to 11 characters (length of filenames)
+	push di
+	repe cmpsb			; Repeat string instruction while operands are equal(zero flag = 1) or until cx is 0, cx is decremented on each iteration
+					; Compare string bytes located at ds:si and es:di, si and di: incremented when direction flag = 0, decremented when direction flag = 1
+
+	pop di				; Restore value
+	je .found_kernel		; Jump if strings are equal
+
+	add di, 32			; Moving to the next directory entry
+	inc bx				; Increase checked directory entry count
+	cmp bx, [bdb_dir_entries_count]	; Validate if there are more entries to check
+	jl .search_kernel		; If the count of checked directories is less than the available -> repeat
+
+	; Kernel not found
+	jmp kernel_not_found_error
+
+.found_kernel:
+
+	; di has the address to the entry
+	mov ax, [di + 26]		; First logical cluster field which has a 26 offset
+	mov [kernel_cluster], ax	; Saving the first cluster
+
+	; load FILE ALLOCATION TABLE from disk into memory and setting parameters for disk_read
+	mov ax, [bdb_reserved_sectors]	
+	mov bx, buffer
+	mov cl, [bdb_sectors_per_fat]
+	mov dl, [ebr_drive_number]
+	call disk_read
+	
+	; Reading kernel and processing the FILE ALLOCATION TABLE chain
+	mov bx, KERNEL_LOAD_SEGMENT
+	mov es, bx
+	mov bx, KERNEL_LOAD_OFFSET
+
+.load_kernel_loop:
+
+	; Reading next cluster 
+	mov ax, [kernel_cluster]
+
+	; HARDCODED FOR NOW
+	add ax, 31 			; First cluster = (kernel_cluster - 2) * Amount of sectors per cluster + start_sector
+
+	mov cl, 1
+	mov dl, [ebr_drive_number]
+	call disk_read
+
+	add bx, [bdb_bytes_per_sector]
+
+	; Calculate the location of the next cluster
+	mov ax, [kernel_cluster]
+	mov cx, 3
+	mul cx
+	mov cx, 2
+	div cx				; ax = byte index of next entry in FILE ALLOCATION TABLE, dx = cluster mod 2
+
+	mov si, buffer
+	add si, ax
+	mov ax, [ds:si]			; Get entry from FILE ALLOCATION TABLE at byte index ax
+
+	or dx, dx			; Checking if even or odd
+	jz .even
+
+.odd:
+	shr ax, 4			; Shifting to the right by 4 to get the 12 bits we need
+	jmp .next_cluster_after
+
+.even:
+	and ax, 0x0FFF
+
+.next_cluster_after:
+	cmp ax, 0x0FF8			; Check if it is the end of the cluster chain (ax>0x0FF8)
+	jae .read_finish		; Jump if above or even
+
+	mov [kernel_cluster], ax	; If not, there are more clusters -> Jump to load_kernel_loop
+	jmp .load_kernel_loop
+
+.read_finish:
+
+	; jump to our kernel
+	mov dl, [ebr_drive_number]	; boot device in dl
+
+	mov ax, KERNEL_LOAD_SEGMENT	; Setting segment registers
+	mov ds, ax			; Setting up data registers
+	mov es, ax
+
+	jmp KERNEL_LOAD_SEGMENT:KERNEL_LOAD_OFFSET	; Far jump to the kernel
+	
+	jmp wait_key_and_reboot		; Shouldnt happen!
+	
+	cli				; disable interrupts
+	hlt
+
 
 ;Prints a string to the screen.
 ;Params:
@@ -65,33 +234,6 @@ puts:
 	ret
 
 
-main:
-	; setup data segments
-	mov ax, 0	; can't write to ds/es directly
-	mov ds, ax
-	mov es, ax
-
-	; setup stack
-	mov ss, ax
-	mov sp, 0x7C00	; stack grows downwards from where we are loaded in memory
-
-	; read something from floppy disk
-	; BIOS should set DL to drive number
-	mov [ebr_drive_number], dl
-
-	mov ax, 1			; LBA=1, second sector from disk
-	mov cl, 1			; 1 sector to read
-	mov bx, 0x7E00			; data should be after the bootloader
-	call disk_read
-
-	
-	; print message
-	mov si, msg_hello	
-	call puts
-
-	cli				; disable interrupts
-	hlt
-
 
 ;
 ; Error handlers
@@ -101,6 +243,10 @@ floppy_error:
 	call puts
 	jmp wait_key_and_reboot
 
+kernel_not_found_error:
+	mov si, msg_kernel_not_found
+	call puts
+	jmp wait_key_and_reboot
 
 wait_key_and_reboot:
 	mov ah, 0
@@ -177,6 +323,7 @@ disk_read:
 
 	mov ah, 02h
 	mov di, 3				; retry count
+
 .retry:
 	pusha					; save all registers, we do not know what bios modifies
 	stc					; set carry flag, as some BIOs do not set it
@@ -229,10 +376,16 @@ disk_reset:
 
 
 
-msg_hello: 		db 'HELLO TO MY WORLD MF', ENDL, 0
-msg_read_failed: 	db 'WE FAILED TO READ MF', ENDL, 0
+msg_loading: 		db 'Bro, I load...', ENDL, 0
+msg_read_failed: 	db 'READ failed bro', ENDL, 0
+msg_kernel_not_found:	db 'Bro where kernel lol', ENDL, 0
+file_kernel_bin:	db 'KERNEL  BIN'
+kernel_cluster:		dw 0
 
-
+KERNEL_LOAD_SEGMENT	equ 0x2000
+KERNEL_LOAD_OFFSET	equ 0
 
 times 510-($-$$) db 0
 dw 0AA55h
+
+buffer:
