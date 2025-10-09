@@ -3,11 +3,36 @@ bits 16
 
 %define ENDL 0x0D, 0x0A
 
+%include "drivers/keyboard.asm"
+
+
+; Code from here until .data
+section .text
+
 start:
 
 	; print message
 	mov si, msg_hello	
 	call puts
+	call print_newline
+
+
+
+.shell_loop:
+	mov si, msg_prompt
+	call puts
+
+	; Read line from the user
+	call read_string
+
+
+	; Echo the input back
+	mov si, di
+	call puts
+	call print_newline
+	call print_newline
+	jmp .shell_loop
+
 
 .halt:
 	cli
@@ -39,5 +64,22 @@ puts:
 	ret
 
 
+
+print_newline:
+	pusha
+	mov ah, 0x0e
+	mov al, 0x0D	; Carriage return
+	int 0x10
+	mov al, 0x0A	; Line feed
+	int 0x10
+	popa
+	ret
+
+
+
+section .data
+
+
 msg_hello: db 'HELLO TO MY WORLD BRO', ENDL, 0
 
+msg_prompt: db '> ', 0
