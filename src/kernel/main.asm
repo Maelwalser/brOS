@@ -3,7 +3,8 @@ bits 16
 
 %define ENDL 0x0D, 0x0A
 
-%include "drivers/keyboard.asm"
+%include "kernel/drivers/keyboard.asm"
+%include "libc/string.asm"
 
 
 ; Code from here until .data
@@ -23,15 +24,55 @@ start:
 	call puts
 
 	; Read line from the user
-	call read_string
+	call read_string	; Calls read_string in drivers/keyboard.asm, Resulting pointer in di
 
 
-	; Echo the input back
-	mov si, di
+	; -- Command Processing Logic --
+	
+	push di		; Save pointer to start of user input to the stack
+	mov bp, sp
+
+	; Check if command is 'bro go'
+	mov si, [bp]	
+	mov di, command_open_directory
+	call compare_strings
+	je .cmd_open_directory
+	
+	; Check if command is 'bro where'
+	mov si, [bp]	
+	mov di, command_show_current_dir
+	call compare_strings
+	je .cmd_show_current_dir
+
+	; Everything else unknown	
+	add sp, 2	; Clean stack pointer
+	jmp .unknown_command
+
+
+.cmd_open_directory:
+	add sp, 2	; Clean stack pointer
+	mov si, msg_cmd_go
 	call puts
 	call print_newline
+	jmp .shell_loop_end
+
+.cmd_show_current_dir:
+	add sp, 2	; Clean stack pointer
+	mov si, msg_cmd_where
+	call puts
+	call print_newline
+	jmp .shell_loop_end
+
+.unknown_command:
+	mov si, msg_unknown
+	call puts	
+	call print_newline
+
+.shell_loop_end:
 	call print_newline
 	jmp .shell_loop
+
+
 
 
 .halt:
@@ -63,11 +104,10 @@ puts:
 	pop si
 	ret
 
-
-
 print_newline:
 	pusha
 	mov ah, 0x0e
+  mov bh, 0
 	mov al, 0x0D	; Carriage return
 	int 0x10
 	mov al, 0x0A	; Line feed
@@ -81,5 +121,14 @@ section .data
 
 
 msg_hello: db 'HELLO TO MY WORLD BRO', ENDL, 0
-
 msg_prompt: db '> ', 0
+
+; Command Strings
+command_open_directory:	db 'bro go', 0
+command_show_current_dir:	db 'bro where', 0
+
+; Command Responses
+msg_cmd_go:	db 'I am going bro', 0
+msg_cmd_where:	db 'I searching bro', 0
+msg_unknown:	db 'IDK bro...', 0
+

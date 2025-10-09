@@ -1,9 +1,9 @@
 ASM=nasm
-CC=gcc
 
-
-SRC_BOOT_DIR=src/boot
-SRC_KERNEL_DIR=src/kernel
+SRC_DIR=src
+SRC_BOOT_DIR=$(SRC_DIR)/boot
+SRC_KERNEL_DIR=$(SRC_DIR)/kernel
+SRC_LIBC_DIR=$(SRC_DIR)/libc
 
 BUILD_DIR=build
 
@@ -42,8 +42,8 @@ $(BUILD_DIR)/bootloader.bin: always	$(SRC_BOOT_DIR)/boot.asm
 #
 kernel: $(BUILD_DIR)/kernel.bin
 
-$(BUILD_DIR)/kernel.bin: always $(SRC_KERNEL_DIR)/main.asm $(SRC_KERNEL_DIR)/drivers/keyboard.asm
-	$(ASM) -I$(SRC_KERNEL_DIR)/ $(SRC_KERNEL_DIR)/main.asm -f bin -o $(BUILD_DIR)/kernel.bin
+$(BUILD_DIR)/kernel.bin: always $(SRC_KERNEL_DIR)/main.asm $(SRC_KERNEL_DIR)/drivers/keyboard.asm $(SRC_LIBC_DIR)/string.asm
+	$(ASM) -I$(SRC_DIR)/ $(SRC_KERNEL_DIR)/main.asm -f bin -o $(BUILD_DIR)/kernel.bin
 
 
 

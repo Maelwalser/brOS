@@ -22,14 +22,13 @@ read_string:
 	cmp al, 0x08	; Check if keypress is Backspace (ASCII 0x08)
 	je .backspace
 
-
 	cmp al, 0x0D	; Check if keypress is Enter (ASCII 0x0D)
 	je .done
 
 	; Prevent buffer overflow
-	mov cx, di
-	sub cx, keyboard_buffer
-	cmp cx, KEYBOARD_BUFFER_SIZE - 1
+	mov cx, di	; Save pointer to current position in buffer to cx
+	sub cx, keyboard_buffer	; Get the offset of the current position
+	cmp cx, KEYBOARD_BUFFER_SIZE - 1	; Check if we arrived at the end of our buffer
 	je .loop
 
 
@@ -40,6 +39,7 @@ read_string:
 
 	; Echo the character to the screen
 	mov ah, 0x0E	; BIOS teletype output function
+  mov bh, 0
 	int 0x10	; BIOS video interrupt
 
 	jmp .loop	; Loop and wait for nex character
@@ -55,6 +55,7 @@ read_string:
 	; Update the screen to remove character
 	mov ah, 0x0E	; BIOS teletype output function
 
+	mov bh, 0	; Setting video page
 	mov al, 0x08	; Backspace character
 	int 0x10	; BIOS video interrupt
 
@@ -72,22 +73,23 @@ read_string:
 
 	; Add a newline to the screen
 	mov ah, 0x0E
+	mov bh, 0	; Setting video page
 	mov al, 0x0D	; Carriage return
 	int 0x10
 	mov al, 0x0A	; Line feed
 	int 0x10
 
 	; Calculate string length
-	mov cx, di
-	sub cx, keyboard_buffer	; cx = length (di - start adress)
+	mov dx, di
+	sub dx, keyboard_buffer	; dx = length (di - start adress)
 
+	popa		; Restore all registers
 
 	; Set di to point to the beginning of the string for the calller
 	mov di, keyboard_buffer
+	mov cx, dx
 
-	popa		; Restore all registers
 	ret
-
 
 section .bss
 ; Defines Buffer for keyboard input
