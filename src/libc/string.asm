@@ -19,7 +19,7 @@ compare_strings:
 	mov ah, [di]	; Get character from the first string
   
 
-	cmp al, ah  	; Compare the characters
+	cmp al, ah	; Compare the characters
 	jne .done	; Characters not equal
 
 	cmp al, 0	; Check if the character is a null terminator

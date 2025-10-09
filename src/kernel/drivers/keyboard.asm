@@ -39,7 +39,7 @@ read_string:
 
 	; Echo the character to the screen
 	mov ah, 0x0E	; BIOS teletype output function
-  mov bh, 0
+ 	mov bh, 0
 	int 0x10	; BIOS video interrupt
 
 	jmp .loop	; Loop and wait for nex character
@@ -55,8 +55,8 @@ read_string:
 	; Update the screen to remove character
 	mov ah, 0x0E	; BIOS teletype output function
 
-	mov bh, 0	; Setting video page
 	mov al, 0x08	; Backspace character
+	mov bh, 0	; Setting video page
 	int 0x10	; BIOS video interrupt
 
 	mov al, ' '	; Overwrite with a space
@@ -73,25 +73,24 @@ read_string:
 
 	; Add a newline to the screen
 	mov ah, 0x0E
-	mov bh, 0	; Setting video page
 	mov al, 0x0D	; Carriage return
+	mov bh, 0	; Setting video page
 	int 0x10
 	mov al, 0x0A	; Line feed
 	int 0x10
 
 	; Calculate string length
-	mov dx, di
-	sub dx, keyboard_buffer	; dx = length (di - start adress)
+	mov cx, di
+	sub cx, keyboard_buffer	; cx = length (di - start adress)
 
 	popa		; Restore all registers
 
 	; Set di to point to the beginning of the string for the calller
 	mov di, keyboard_buffer
-	mov cx, dx
-
 	ret
 
 section .bss
+
 ; Defines Buffer for keyboard input
 KEYBOARD_BUFFER_SIZE equ 256
 keyboard_buffer: resb KEYBOARD_BUFFER_SIZE

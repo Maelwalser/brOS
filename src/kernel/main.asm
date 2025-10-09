@@ -12,6 +12,7 @@ section .text
 
 start:
 
+
 	; print message
 	mov si, msg_hello	
 	call puts
@@ -45,7 +46,6 @@ start:
 	je .cmd_show_current_dir
 
 	; Everything else unknown	
-	add sp, 2	; Clean stack pointer
 	jmp .unknown_command
 
 
@@ -64,15 +64,15 @@ start:
 	jmp .shell_loop_end
 
 .unknown_command:
+	add sp, 2	; Clean stack pointer
 	mov si, msg_unknown
 	call puts	
 	call print_newline
+	jmp .shell_loop_end
 
 .shell_loop_end:
 	call print_newline
 	jmp .shell_loop
-
-
 
 
 .halt:
@@ -107,7 +107,7 @@ puts:
 print_newline:
 	pusha
 	mov ah, 0x0e
-  mov bh, 0
+  	mov bh, 0
 	mov al, 0x0D	; Carriage return
 	int 0x10
 	mov al, 0x0A	; Line feed
@@ -129,6 +129,6 @@ command_show_current_dir:	db 'bro where', 0
 
 ; Command Responses
 msg_cmd_go:	db 'I am going bro', 0
-msg_cmd_where:	db 'I searching bro', 0
+msg_cmd_where:	db 'I am searching bro', 0
 msg_unknown:	db 'IDK bro...', 0
 
