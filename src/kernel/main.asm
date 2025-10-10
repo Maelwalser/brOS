@@ -3,8 +3,6 @@ bits 16
 
 %define ENDL 0x0D, 0x0A
 
-%include "kernel/drivers/keyboard.asm"
-%include "libc/string.asm"
 
 
 ; Code from here until .data
@@ -12,12 +10,10 @@ section .text
 
 start:
 
-
-	; print message
+	; print welcome message
 	mov si, msg_hello	
 	call puts
 	call print_newline
-
 
 
 .shell_loop:
@@ -108,6 +104,8 @@ print_newline:
 	ret
 
 
+%include "kernel/drivers/keyboard.asm"
+%include "libc/string.asm"
 
 section .data
 
