@@ -34,10 +34,18 @@ start:
 	je .cmd_open_directory
 	
 	; Check if command is 'bro where'
-	mov si, keyboard_buffer	
+	mov si, keyboard_buffer
 	mov di, command_show_current_dir
 	call compare_strings
 	je .cmd_show_current_dir
+
+
+	; Check if command is 'bro help'
+	mov si, keyboard_buffer
+	mov di, command_help
+	call compare_strings
+	je .cmd_help
+
 
 	; Everything else unknown	
 	jmp .unknown_command
@@ -50,6 +58,11 @@ start:
 
 .cmd_show_current_dir:
 	mov si, msg_cmd_where
+	call puts
+	jmp .shell_loop_end
+
+.cmd_help:
+	mov si, msg_help
 	call puts
 	jmp .shell_loop_end
 
@@ -75,15 +88,17 @@ start:
 section .data
 
 
-msg_hello: db 'HELLO TO MY WORLD BRO', ENDL, 0
-msg_prompt: db '> ', 0
+msg_hello: 			db 'WELCOME TO MY WORLD BRO', ENDL, 0
+msg_prompt:			db '> ', 0
 
 ; Command Strings
-command_open_directory:	db 'bro go', 0
+command_open_directory:		db 'bro go', 0
 command_show_current_dir:	db 'bro where', 0
+command_help:			db 'bro help', 0
 
 ; Command Responses
-msg_cmd_go:	db 'I am going bro', 0
-msg_cmd_where:	db 'I am searching bro', 0
-msg_unknown:	db 'IDK what you are talking about bro...', 0
+msg_cmd_go:			db 'I am going bro', 0
+msg_cmd_where:			db 'I am searching bro', 0
+msg_unknown:			db 'IDK what you are talking about bro...', 0
+msg_help:			db 'Looks like a you problem', 0
 
