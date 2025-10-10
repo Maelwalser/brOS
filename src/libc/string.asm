@@ -17,7 +17,6 @@ compare_strings:
 .loop:
 	mov al, [si]	; Get character from the first string
 	mov ah, [di]	; Get character from the first string
-  
 
 	cmp al, ah	; Compare the characters
 	jne .done	; Characters not equal

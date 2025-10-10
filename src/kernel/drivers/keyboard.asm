@@ -19,11 +19,12 @@ read_string:
 
 	; AL contains the ASCII code of the key pressed
 
+	cmp al, 0x0D	; Check if keypress is Enter (ASCII 0x0D)
+	je .done
+
 	cmp al, 0x08	; Check if keypress is Backspace (ASCII 0x08)
 	je .backspace
 
-	cmp al, 0x0D	; Check if keypress is Enter (ASCII 0x0D)
-	je .done
 
 	; Prevent buffer overflow
 	mov cx, di	; Save pointer to current position in buffer to cx
@@ -31,16 +32,14 @@ read_string:
 	cmp cx, KEYBOARD_BUFFER_SIZE - 1	; Check if we arrived at the end of our buffer
 	je .loop
 
-
-	; It is a printabe character
-	mov [di], al	; Store character in our buffer
-	inc di		; Move to the next position in the buffer
-
-
 	; Echo the character to the screen
 	mov ah, 0x0E	; BIOS teletype output function
  	mov bh, 0
 	int 0x10	; BIOS video interrupt
+
+	; It is a printabe character
+	mov [di], al	; Store character in our buffer
+	inc di		; Move to the next position in the buffer
 
 	jmp .loop	; Loop and wait for nex character
 
@@ -54,14 +53,10 @@ read_string:
 
 	; Update the screen to remove character
 	mov ah, 0x0E	; BIOS teletype output function
-
 	mov al, 0x08	; Backspace character
-	mov bh, 0	; Setting video page
 	int 0x10	; BIOS video interrupt
-
 	mov al, ' '	; Overwrite with a space
 	int 0x10	; BIOS video interrupt
-
 	mov al, 0x08	; Move cursor back again
 	int 0x10	; BIOS video interrupt
 
@@ -74,7 +69,6 @@ read_string:
 	; Add a newline to the screen
 	mov ah, 0x0E
 	mov al, 0x0D	; Carriage return
-	mov bh, 0	; Setting video page
 	int 0x10
 	mov al, 0x0A	; Line feed
 	int 0x10

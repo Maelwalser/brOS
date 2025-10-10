@@ -28,19 +28,17 @@ start:
 	call read_string	; Calls read_string in drivers/keyboard.asm, Resulting pointer in di
 
 
+
 	; -- Command Processing Logic --
-	
-	push di		; Save pointer to start of user input to the stack
-	mov bp, sp
 
 	; Check if command is 'bro go'
-	mov si, [bp]	
+	mov si, keyboard_buffer
 	mov di, command_open_directory
 	call compare_strings
 	je .cmd_open_directory
 	
 	; Check if command is 'bro where'
-	mov si, [bp]	
+	mov si, keyboard_buffer	
 	mov di, command_show_current_dir
 	call compare_strings
 	je .cmd_show_current_dir
@@ -50,24 +48,18 @@ start:
 
 
 .cmd_open_directory:
-	add sp, 2	; Clean stack pointer
 	mov si, msg_cmd_go
 	call puts
-	call print_newline
 	jmp .shell_loop_end
 
 .cmd_show_current_dir:
-	add sp, 2	; Clean stack pointer
 	mov si, msg_cmd_where
 	call puts
-	call print_newline
 	jmp .shell_loop_end
 
 .unknown_command:
-	add sp, 2	; Clean stack pointer
 	mov si, msg_unknown
 	call puts	
-	call print_newline
 	jmp .shell_loop_end
 
 .shell_loop_end:
@@ -107,7 +99,7 @@ puts:
 print_newline:
 	pusha
 	mov ah, 0x0e
-  	mov bh, 0
+	mov bh, 0	; Screen
 	mov al, 0x0D	; Carriage return
 	int 0x10
 	mov al, 0x0A	; Line feed
