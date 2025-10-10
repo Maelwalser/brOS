@@ -120,5 +120,5 @@ command_show_current_dir:	db 'bro where', 0
 ; Command Responses
 msg_cmd_go:	db 'I am going bro', 0
 msg_cmd_where:	db 'I am searching bro', 0
-msg_unknown:	db 'IDK bro...', 0
+msg_unknown:	db 'IDK what you are talking about bro...', 0
 
