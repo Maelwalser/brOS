@@ -3,8 +3,7 @@
 ; ----------------------------------
 
 ; Making the puts lable visible to other files at link time
-GLOBAL puts
-
+GLOBAL puts, print_newline
 
 ; Prints a string to the screen
 ; Params:
@@ -33,3 +32,16 @@ puts:
 
 
 
+; Prints a newline character to the screen
+; Clobbers:
+;	- ax, bx
+print_newline:
+	pusha		; Saving all registers
+	mov ah, 0x0e
+	mov bh, 0	; Screen
+	mov al, 0x0D	; Carriage return
+	int 0x10
+	mov al, 0x0A	; Line feed
+	int 0x10
+	popa
+	ret
