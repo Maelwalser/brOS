@@ -1,8 +1,7 @@
 bits 16
-
 section .text
 
-
+;
 ; Loads the FAT12 filesystem into memory
 ; 
 fat12_init:
@@ -28,10 +27,8 @@ fat12_list_directory:
 	cmp byte [current_dir_is_root], 1
 	je .list_root
 
-
-	; Else list subdirectory
-	jmp .list_subdir
-
+.list_subdir:
+	jmp .done
 
 
 .list_root:
@@ -44,28 +41,29 @@ fat12_list_directory:
 	; Adding the size of the RESERVED region to get the start of the ROOT DIRECTORY
 	add ax, [bdb_reserved_sectors]	; Adding the RESERVED region
 
+	push ax				; Saving the root directory's LBA
+
+
+
+	mov bx, dir_buffer
 
 	; Getting the size of the ROOT DIRECTOY, one entry is 32 bytes -> 32 * entries count = size in bytes
 	mov ax, [bdb_dir_entries_count]	; Amount of entries in the ROOT DIRECTORY
 	shl ax, 5			; Shifting ax 5 bits to the left, which is equal to multiplying it by 32 (2^5 = 32)
-	xor dx, dx			; zeroing out the dx register for storing remainder
+	xor dx, dx
 	div word [bdb_bytes_per_sector]	; AX(bdb_dir_entries) / bytes_per_sector = amount of sectors in ROOT DIRECTORY, Result is stored in AL
+
 	test dx, dx			; Checking if the remainder is not 0
-	jz .root_dir_after
+	jz .no_round_up
 	inc ax				; Rounding up amount of sectors if there are partially filled sectors
 
 
-.root_dir_after:
+.no_round_up:
 	; read ROOT DIRECTORY
 
-	push ax				; Save sector count
-	mov ax, [bdb_sectors_per_fat]
-	mov bl, [bdb_fat_count]
-	xor bh, bh
-	mul bx
-	add ax, [bdb_reserved_sectors]
+	mov cl, al
 
-	pop cx				; Sector count in cl
+	pop ax
 	mov bx, dir_buffer
 	mov dl, [ebr_drive_number]
 	call disk_read
@@ -73,34 +71,20 @@ fat12_list_directory:
 	; Print entries
 	mov si, dir_buffer
 	mov cx, [bdb_dir_entries_count]
-	jmp .print_entries
 
 
-
-.list_subdir:
-	; Loading subdirectory from cluster chain
-	mov ax, [current_dir_cluster]
-	call fat12_read_cluster
-
-	; Calculate number of entries
-	mov cx, [bdb_bytes_per_sector]
-	shr cx, 5			; Divide by 32 bytes (size of one entry)
-	mov si, dir_buffer
-
-
-.print_entries:
-	
 .entry_loop:
 	; Check if entry is empty (0x00 or 0xE5)
 	mov al, [si]
 	cmp al, 0x00
-	je .next_entry
+	je .done
 	cmp al, 0xE5			; Deleted entry
 	je .next_entry
 
 	; Check if it is a volume
-	mov al, [si + 11]
-	and al, 0x08			; Volume label bit
+	mov bl, [si + 11]
+	and bl, 0x08			; Volume label bit
+	jnz .next_entry
 
 	call .print_entry
 
@@ -108,19 +92,21 @@ fat12_list_directory:
 
 .next_entry:
 	add si, 32
-	dec cx
-	jnz .entry_loop
+	loop .entry_loop
 
 
 
+.done:
 	popa
 	ret
 
 .print_entry:
 	pusha
+
 	mov di, si
 	mov cx, 8
-.print_name:
+
+.print_name_loop:
 	mov al, [di]
 	cmp al, ' '
 	je .print_ext
@@ -128,20 +114,20 @@ fat12_list_directory:
 	mov bh, 0
 	int 0x10
 	inc di
-	dec cx
-	jnz .print_name
+	loop .print_name_loop
 
 .print_ext:
 	mov di, si
 	add di, 8
-	mov cx, 3
 	mov al, [di]
 	cmp al, ' '
 	je .check_dir
 
-	mov ah 0x0E
+	mov ah, 0x0E
 	mov al, '.'
 	int 0x10
+
+	mov cx, 3
 
 .print_ext_loop:
 	mov al, [di]
@@ -150,51 +136,24 @@ fat12_list_directory:
 	mov ah, 0x0E
 	int 0x10
 	inc di
-	dec cx
-	jnz .print_ext_loop
+	loop .print_ext_loop
 
 .check_dir:
 	mov al, [si + 11]
 	and al, 0x10
-	jz .print_newline
+	jz .print_newline_and_ret
 	push si
 	mov si, str_dir_marker
 	call puts
 	pop si
 
-.print_newline:
+.print_newline_and_ret:
 	call print_newline
 	popa
 	ret
 
 
 
-
-
-; Change directory
-;
-;
-;
-.search_entries:
-	
-	mov si, dir_buffer
-	mov cx, 
-; Prints the the entries
-; cx number of  entries to check
-; si pointer to current entry
-.print_entries:
-	
-
-.next_entry:
-
-.print_entry:
-	pusha
-	
-
-
-
-
-;
 ; Read a cluster from the disk
 ; Parameters:
 ; - ax: cluster number
@@ -204,24 +163,19 @@ fat12_read_cluster:
 	pusha
 	
 	sub ax, 2
-	xor bx, bx
-	mov bl, [bdb_sectors_per_cluster]	
-	mul bx
+	mov cl, [bdb_sectors_per_cluster]	
+	mul cl
 
 	push ax
 
 	mov ax, [bdb_sectors_per_fat]
-	mov bl, [bdb_fat_count]
-	xor bh, bh
-	mul bx
+	mov cl, [bdb_fat_count]
+	mul cl
 	add ax, [bdb_reserved_sectors]
 
-
-
-
-	mov bx, [bdb_dir_entries_count]
-	shl bx, 5
-	xor dx, dx
+	mov cx, [bdb_dir_entries_count]
+	shl cx, 5
+	mov dx, 0
 	div word [bdb_bytes_per_sector]
 	test dx, dx
 
@@ -229,16 +183,13 @@ fat12_read_cluster:
 	inc ax
 
 .no_round:
-	moc bx, ax
-	pop ax
+	pop bx
 	add ax, bx
 
 
 
-
-	mov bx, dir_buffer
 	mov cl, [bdb_sectors_per_cluster]
-	mov dl, [ebr_drive_number]
+	mov bx, dir_buffer
 	call disk_read
 	
 
@@ -247,19 +198,28 @@ fat12_read_cluster:
 
 
 
-%include "kernel/drivers/disk.asm"
+
+
+
 
 section .data
-str_dir_marker:	db ' [DIR]',0
+
+bdb_bytes_per_sector: dw 512
+bdb_sectors_per_cluster: db 1
+bdb_reserved_sectors: dw 1
+bdb_fat_count: db 2
+bdb_dir_entries_count: dw 224
+bdb_sectors_per_fat: dw 9
+ebr_drive_number: db 0
+str_dir_marker: db ' [DIR]',0
 
 section .bss
 
 ; Current directory tracking
 current_dir_cluster: resw 1
-current_dir_cluster: resb 1
+current_dir_is_root: resb 1
 
 ; Buffers
-fat_buffer: resb 4608	; 9 sectors * 512 bytes
-dir_buffer: resb 512	; One sector for directory entries 
-
+fat_buffer: resb 4608 ; 9 sectors * 512 bytes
+dir_buffer: resb 512 ; One sector for directory entries 
 

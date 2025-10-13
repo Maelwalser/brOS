@@ -42,7 +42,13 @@ $(BUILD_DIR)/bootloader.bin: always	$(SRC_BOOT_DIR)/boot.asm
 #
 kernel: $(BUILD_DIR)/kernel.bin
 
-$(BUILD_DIR)/kernel.bin: always $(SRC_KERNEL_DIR)/main.asm $(SRC_KERNEL_DIR)/drivers/keyboard.asm $(SRC_LIBC_DIR)/string.asm $(SRC_LIBC_DIR)/stdio.asm
+$(BUILD_DIR)/kernel.bin: always \
+	$(SRC_KERNEL_DIR)/main.asm \
+	$(SRC_KERNEL_DIR)/drivers/keyboard.asm \
+	$(SRC_LIBC_DIR)/string.asm \
+	$(SRC_LIBC_DIR)/stdio.asm \
+	$(SRC_KERNEL_DIR)/fs/fat12.asm \
+	$(SRC_KERNEL_DIR)/drivers/disk.asm 
 	$(ASM) -I$(SRC_DIR)/ $(SRC_KERNEL_DIR)/main.asm -f bin -o $(BUILD_DIR)/kernel.bin
 
 

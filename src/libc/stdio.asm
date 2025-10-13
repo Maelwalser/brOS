@@ -14,7 +14,7 @@ puts:
 	; Saving register we will modify
 	push si
 	push ax
-.loop
+.loop:
 	lodsb		; Load byte from di:si into al, and increment si
 	or al, al	; Check if the byte is zero (end of string)
 	jz .done	; Jump to done if 0
@@ -25,7 +25,7 @@ puts:
 	jmp .loop	; Repeat for next character
 
 
-.done
+.done:
 	pop ax
 	pop si
 	ret

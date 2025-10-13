@@ -10,6 +10,18 @@ section .text
 
 start:
 
+	; Setting up segmented registers to point to our code segment
+	mov ax, cs
+	mov ds, ax
+	mov es, ax
+
+	; Setting up stack
+	mov ss, ax
+	mov sp, 0x9000	; 
+
+	call fat12_init
+
+
 	; print welcome message
 	mov si, msg_hello	
 	call puts
@@ -59,6 +71,8 @@ start:
 .cmd_show_current_dir:
 	mov si, msg_cmd_where
 	call puts
+	call print_newline
+	call fat12_list_directory
 	jmp .shell_loop_end
 
 .cmd_help:
@@ -84,6 +98,8 @@ start:
 %include "libc/stdio.asm"
 %include "kernel/drivers/keyboard.asm"
 %include "libc/string.asm"
+%include "kernel/drivers/disk.asm"
+%include "kernel/fs/fat12.asm"
 
 section .data
 
