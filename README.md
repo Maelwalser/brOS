@@ -3,10 +3,12 @@ Learning to write an Operating system in Assembly x86 :)
 - Using the FAT12 filesystem
 - Running on a floppy_disk image 
 
-## Bootloader
+---
 
+## Bootloader
+Small section of 512 bytes which loads the kernel and sets up other important things like the filesystem for example.
 ### Setting Up FAT12 File System
-#### FAt12 Header
+#### FAT12 Header
 We use a data structure called BIOS Parameter Block (BPB) to describe the layout of the FAT12 filesystem on the disk.
 ```asm
 jmp short start
@@ -268,8 +270,9 @@ disk_reset:
 **int 13h**: Calls the BIOS to reset the drive specified in **DL**<br/>
 **jc floppy_error**: Jump if No Carry. When the reset of the controller itself fails we jump to the error handler
 
+---
 
-### FileSystem FAT12
+## FileSystem FAT12
 Way of organizing data on a disk.
 #### Structure
 A FAT disk is typically organized in 4 sectors/regions:
@@ -323,6 +326,8 @@ To read files from folders we have to split the path into components parts (With
 Then the same steps from before apply. Directories have the same structure as the root directory and can be read just like an ordinary file.<br/>
 After that we search the next component from the path in the directory and read it<br/>
 -> Repeat until we reach and read the file
+
+---
 
 ## Keyboard driver
 To get input from the keyboard and write the characters to the screen we need a keyboard driver.
