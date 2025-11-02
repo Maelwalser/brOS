@@ -4,6 +4,66 @@ Learning to write an Operating system in Assembly x86 :)
 - Running on a floppy_disk image 
 
 ---
+#### Floppy Disks
+Why I am using a floppy disk to learn OS development:
+- Ease of use
+- Universal support
+- FAT12 - one of the simplest file systems
+
+To read or write something, we need a way to tell the controller (of a HDD or floppy disk) where our data is.<br/>
+We can do this by giving it the **Cylinder** number, **Head** number and the **Sector** number. This is called a **CHS** scheme (Cylinder Head Sector)<br/>
+This is practical for knowing the physical location of the data.<br/>
+The **Cylinder** and **Head** are indexed from 0 but the **Sector** starts from 1.
+
+When working with disks we do not need to know that, we only need to know if it is at the beginning, middle or the end of the disk.<br/>
+This can be done using the Logical Block Addressing scheme (**LBA**). Which makes it possible to address a single block on the disk with 1 number.
+
+Modern disks are way more complex but still act like they have a Cylinder, Head and Sector to support this legacy way of addressing.
+
+##### Conversion From LBA to CHS
+We have 2 constants:
+- Number of **Sectors** per **Cylinder** (on a single side)
+	- How many **Sectors** we can fit on a single **Track** on one side of the disk
+- Number of **Heads** per **Cylinder** (or just **heads**)
+	- Number of faces the entire disk has
+
+We can get the **Sector** by getting the remainder of the **Logical** **Block** **Address** divided by the amount of **Sectors** per **Track** plus 1:<br/>
+`sector = (LBA % sectors per track) + 1`<br/>
+We can get the **Head** by dividing the **Logical** **Block** **Address** by the amount of **Sectors** per **Track** and getting the remainder of that divided by the amount of **Heads**<br/>
+`head = (LBA / sectors per track) % heads`<br/>
+We can get the cylinder by dividing the **Logical** **Block** **Address** by the amount of **Sectors** per **Track** and dividing it by the amount of **Heads**<br/>
+`cylinder = (LBA / sectors per track) / heads`
+
+## Master Boot Record
+The **Master Boot Record** is the very first user-defined program that gains control of the machine after the BIOS completes its Power-On Self-Test (POST).
+### Location
+The Master Boot Record (MBR) is a 512-byte sector located at the absolute beginning of a partitioned storage device.
+- **Logical Address:** Logical Block Addressing 0 (**LBA** addressing)
+- **Physical Address:** Cylinder 0, Head 0, Sector 1 (**CHS** addressing)<br/>
+The BIOS is hardcoded to find a bootable device, read its first 512-byte sector into a specific memory location and then transfer execution to that location.
+### Boot Process
+1. **POST**: After powering on the computer, the BIOS/firmware runs the Power-On Self-Test, which initializes the hardware.
+2. **Boot Device Selection:** The BIOS Consults its configured boot order (e.g. Floppy, HDD, CD-ROM ....)
+3. **Load Sector 0:** The BIOS finds the first bootable device (e.g. the primary hard drive, `0x80`) and issues a read command (e.g. INT 13h) to load the 512 bytes from **LBA** 0 of that device into physical memory at address `0x0000:0x7C00` (which is physical address `0x7C00`)
+4. **Signature Check:** The BIOS checks the last two bytes of this 512-byte block. If they are not `0x55AA` (The boot signature) the BIOS considers the disk as unbootable and halts.
+5. **The Jump:** If the signature is valid, the BIOS performs an unconditional jump to `0x0000:0x7C00`.
+### Structure of the 512-byte MBR
+The **MBR** is divided into three sections:
+
+| Offset (Hex)        | Size (Bytes) | Description                                                                                            |
+| ------------------- | ------------ | ------------------------------------------------------------------------------------------------------ |
+| `0x000` - `0x1BD`   | 446 bytes    | **Bootstrap Code** Area                                                                                |
+| `0x1BE` - `0x1FS`   | 46 bytes     | Primary Partition Table (4 entries, 16 bytes each)                                                     |
+| <br>`0x1FE` - `0x1` | 2 bytes      | Boot Signature (Must be `0xAA55` on disk, which reads as `0x55AA`in memory<br>due to little-endiannes) |
+### Bootstrap Code Area
+This is the area where you write your code that gets executed. When the 446 bytes of code begin to execute the CPU is in the following state;
+- **Mode:** 16-bit Real Mode
+- **Memory:** 1 MiB addressable (with **segment:offset**)
+- **`CS:IP`:** `0x0000:0x7C00`, where your code is running
+- **`DL` Register:** The BIOS places the **boot drive number** in DL (e.g. `0x80` for the first hard disk, `0x00` for the first floppy). You should save this value at first as you need it in later stages.
+- **`SS:SP`:**  The stack is undefined and unsafe. You should set up the stack as the second action you do. Common practice is to point `SS:SP` to `0x0000:0x7C00`(or just below it) which makes the stack grow downwards from the codes starting address.
+- **`DS`, `ES`,`FS`, `GS`**: The BIOS initializes them to `0x0000` but it is not guaranteed so you should initialize them yourself (e.g. `xor ax, ax`, `mov ds ax`) to establish a known **segment:offset** addressing environment
+
 
 ## Bootloader
 Small section of 512 bytes which loads the kernel and sets up other important things like the filesystem for example.
